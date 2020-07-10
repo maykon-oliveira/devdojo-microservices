@@ -3,12 +3,7 @@ package com.maykonoliveira.auth.security.filter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.maykonoliveira.core.entities.ApplicationUser;
 import com.maykonoliveira.core.properties.JwtConfiguration;
-import com.nimbusds.jose.*;
-import com.nimbusds.jose.crypto.DirectEncrypter;
-import com.nimbusds.jose.crypto.RSASSASigner;
-import com.nimbusds.jose.jwk.JWK;
-import com.nimbusds.jose.jwk.RSAKey;
-import com.nimbusds.jwt.JWTClaimsSet;
+import com.maykonoliveira.token.security.token.creator.TokenCreator;
 import com.nimbusds.jwt.SignedJWT;
 import lombok.AllArgsConstructor;
 import lombok.SneakyThrows;
@@ -17,22 +12,13 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
-import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 import javax.servlet.FilterChain;
-import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import java.io.IOException;
-import java.security.KeyPair;
-import java.security.KeyPairGenerator;
-import java.security.interfaces.RSAPublicKey;
 import java.util.Collections;
-import java.util.Date;
-import java.util.UUID;
-import java.util.stream.Collectors;
 
 /** @author maykon-oliveira */
 @Slf4j
@@ -40,6 +26,7 @@ import java.util.stream.Collectors;
 public class JwtAuthenticationFilter extends UsernamePasswordAuthenticationFilter {
   private final AuthenticationManager manager;
   private final JwtConfiguration jwtConfiguration;
+  private final TokenCreator tokenCreator;
 
   @SneakyThrows
   @Override
@@ -69,88 +56,13 @@ public class JwtAuthenticationFilter extends UsernamePasswordAuthenticationFilte
       HttpServletRequest request,
       HttpServletResponse response,
       FilterChain chain,
-      Authentication authResult)
-      throws IOException, ServletException {
+      Authentication authResult) {
     log.info("Authentication success '{}'", authResult.getName());
-    final SignedJWT signedJWT = createSignedJWT(authResult);
-    final String s = encryptToken(signedJWT);
+    final SignedJWT signedJWT = tokenCreator.createSignedJWT(authResult);
+    final String s = tokenCreator.encryptToken(signedJWT);
     response.addHeader(
         "Access-Control-Expose-Headers", "XSRF-TOKEN, " + jwtConfiguration.getHeader().getName());
     response.addHeader(
         jwtConfiguration.getHeader().getName(), jwtConfiguration.getHeader().getPrefix() + s);
-  }
-
-  @SneakyThrows
-  private SignedJWT createSignedJWT(Authentication authentication) {
-    log.info("createSignedJWT");
-
-    final ApplicationUser principal = (ApplicationUser) authentication.getPrincipal();
-
-    final JWTClaimsSet jwtClaimsSet = createJWTClaimsSet(authentication, principal);
-
-    final KeyPair rsaKeys = generateKeyPair();
-
-    log.info("JWK from RSA");
-
-    final JWK jwk =
-        new RSAKey.Builder((RSAPublicKey) rsaKeys.getPublic())
-            .keyID(UUID.randomUUID().toString())
-            .build();
-
-    final SignedJWT signedJWT =
-        new SignedJWT(
-            new JWSHeader.Builder(JWSAlgorithm.RS256).jwk(jwk).type(JOSEObjectType.JWT).build(),
-            jwtClaimsSet);
-
-    log.info("Assigning token");
-
-    final RSASSASigner rsassaSigner = new RSASSASigner(rsaKeys.getPrivate());
-    signedJWT.sign(rsassaSigner);
-
-    log.info("JWT '{}'", signedJWT.serialize());
-
-    return signedJWT;
-  }
-
-  private JWTClaimsSet createJWTClaimsSet(
-      Authentication authentication, ApplicationUser applicationUser) {
-    log.info("createJWTClaimsSet to '{}'", applicationUser.getUsername());
-
-    return new JWTClaimsSet.Builder()
-        .subject(applicationUser.getUsername())
-        .claim(
-            "authorities",
-            authentication.getAuthorities().stream()
-                .map(GrantedAuthority::getAuthority)
-                .collect(Collectors.toList()))
-        .issuer("http://localhost:8080")
-        .issueTime(new Date())
-        .expirationTime(
-            new Date(System.currentTimeMillis() + (jwtConfiguration.getExpiration() * 1000)))
-        .build();
-  }
-
-  @SneakyThrows
-  private KeyPair generateKeyPair() {
-    final KeyPairGenerator generator = KeyPairGenerator.getInstance("RSA");
-    generator.initialize(2048);
-
-    return generator.genKeyPair();
-  }
-
-  @SneakyThrows
-  private String encryptToken(SignedJWT signedJWT) {
-    log.info("Encrypting");
-    final DirectEncrypter encrypter =
-        new DirectEncrypter(jwtConfiguration.getPrivateKey().getBytes());
-    final JWEObject jwt =
-        new JWEObject(
-            new JWEHeader.Builder(JWEAlgorithm.DIR, EncryptionMethod.A128CBC_HS256)
-                .contentType("JWT")
-                .build(),
-            new Payload(signedJWT));
-
-    jwt.encrypt(encrypter);
-    return jwt.serialize();
   }
 }
