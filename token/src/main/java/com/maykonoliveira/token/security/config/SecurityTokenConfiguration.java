@@ -2,6 +2,7 @@ package com.maykonoliveira.token.security.config;
 
 import com.maykonoliveira.core.properties.JwtConfiguration;
 import lombok.AllArgsConstructor;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
 import org.springframework.web.cors.CorsConfiguration;
@@ -30,7 +31,13 @@ public class SecurityTokenConfiguration extends WebSecurityConfigurerAdapter {
             (req, res, e) -> res.sendError(HttpServletResponse.SC_UNAUTHORIZED))
         .and()
         .authorizeRequests()
-        .antMatchers(jwtConfiguration.getLoginUrl())
+        .antMatchers(jwtConfiguration.getLoginUrl(), "/**/swagger-ui.html")
+        .permitAll()
+        .antMatchers(
+            HttpMethod.GET,
+            "/**/swagger-resources/**",
+            "/**/webjars/springfox-swagger-ui/**",
+            "/**/v2/api-docs/**")
         .permitAll()
         .antMatchers("/course/v1/admin/**")
         .hasRole("ADMIN")
