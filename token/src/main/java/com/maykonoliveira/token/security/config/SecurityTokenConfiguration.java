@@ -34,6 +34,8 @@ public class SecurityTokenConfiguration extends WebSecurityConfigurerAdapter {
         .permitAll()
         .antMatchers("/course/v1/admin/**")
         .hasRole("ADMIN")
+        .antMatchers("/auth/v1/users/me")
+        .hasAnyRole("ADMIN", "USER")
         .anyRequest()
         .authenticated();
   }

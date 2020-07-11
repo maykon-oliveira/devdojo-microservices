@@ -6,7 +6,6 @@ import com.nimbusds.jwt.SignedJWT;
 import lombok.AllArgsConstructor;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import javax.servlet.FilterChain;
@@ -30,7 +29,7 @@ public class JWTTokenAuthorizationFilter extends OncePerRequestFilter {
       throws ServletException, IOException {
     String header = req.getHeader(jwtConfiguration.getHeader().getName());
 
-    if (header == null || header.startsWith(jwtConfiguration.getHeader().getPrefix())) {
+    if (header == null || !header.startsWith(jwtConfiguration.getHeader().getPrefix())) {
       chain.doFilter(req, res);
       return;
     }
@@ -38,7 +37,7 @@ public class JWTTokenAuthorizationFilter extends OncePerRequestFilter {
     final String token = header.replace(jwtConfiguration.getHeader().getPrefix(), "").trim();
 
     setSecurityContext(
-        StringUtils.equalsIgnoreCase("signed", jwtConfiguration.getType())
+        jwtConfiguration.getType().equalsIgnoreCase("signed")
             ? validate(token)
             : decryptValidating(token));
 
