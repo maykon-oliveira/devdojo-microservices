@@ -73,6 +73,7 @@ public class TokenCreator {
             authentication.getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority)
                 .collect(Collectors.toList()))
+        .claim("userId", applicationUser.getId())
         .issuer("http://localhost:8080")
         .issueTime(new Date())
         .expirationTime(
